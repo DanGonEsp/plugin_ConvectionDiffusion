@@ -43,7 +43,9 @@ set(SOURCES		convection_diffusion_base.cpp
 				fvcr/convection_diffusion_fvcr.cpp
 				fv/convection_diffusion_fv.cpp
 				fractfv1/convection_diffusion_fractfv1.cpp
-				convection_diffusion_plugin.cpp)
+				convection_diffusion_plugin.cpp
+                upwind.cpp
+                upwind_interface.cpp)
 
 
 ################################################################################

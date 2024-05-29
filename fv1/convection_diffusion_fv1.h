@@ -39,6 +39,7 @@
 // plugin's internal headers
 #include "../convection_diffusion_base.h"
 #include "../convection_diffusion_sss.h"
+#include "../upwind_interface.h"
 
 namespace ug{
 namespace ConvectionDiffusionPlugin{
@@ -282,6 +283,15 @@ class ConvectionDiffusionFV1 : public ConvectionDiffusionBase<TDomain>
 	///	returns the updated convection shapes
 		typedef IConvectionShapes<dim> conv_shape_type;
 		const IConvectionShapes<dim>& get_updated_conv_shapes(const FVGeometryBase& geo, bool compute_deriv);
+    
+//-----------------------------------------------------------------------
+    ///    Upwinding for scalar value  in convective term of momentum equation
+        SmartPtr<IConvectionDiffusionUpwind<dim> > m_spConvUpwind;
+    public:
+    ///    sets an upwinding for the convective term of momentum equation
+        void set_upwind_new(SmartPtr<IConvectionDiffusionUpwind<dim> > spUpwind)
+            {m_spConvUpwind = spUpwind;}
+//-----------------------------------------------------------------------
 
 	///	computes the concentration
 		template <typename TElem, typename TFVGeom>

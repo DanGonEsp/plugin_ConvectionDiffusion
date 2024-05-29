@@ -46,6 +46,7 @@
 #include "fractfv1/convection_diffusion_fractfv1.h"
 
 #include "convection_diffusion_plugin.h"
+#include "upwind.h"
 
 using namespace std;
 using namespace ug::bridge;
@@ -188,6 +189,7 @@ static void Domain(TRegistry& reg, string grp)
 			.template add_constructor<void (*)(const char*,const char*)>("Function(s)#Subset(s)")
 			.add_method("set_condensed_FV", &T::set_condensed_FV, "", "[De-]Activates the condensed FV scvf ip's")
 			.add_method("set_upwind", &T::set_upwind, "", "Sets the upwind type for the convective terms")
+            .add_method("set_upwind_new", &T::set_upwind_new)
 			.add_method("set_singular_sources_and_sinks", &T::set_sss_manager, "", "Sets the singular sources and sinks manager")
 			.add_method("singular_sources_and_sinks", &T::sss_manager, "", "Returns the singular sources and sinks manager")
 			.set_construct_as_smart_pointer(true);
@@ -229,6 +231,7 @@ static void Domain(TRegistry& reg, string grp)
 		reg.template add_class_<T, TBase >(name, grp)
 			.template add_constructor<void (*)(const char*,const char*)>("Function(s)#Subset(s)")
 			.add_method("set_upwind", &T::set_upwind)
+            .add_method("set_upwind_new", &T::set_upwind_new)
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "ConvectionDiffusionFVCR", tag);
 	}
@@ -285,6 +288,92 @@ static void Dimension(TRegistry& reg, string grp)
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "CDSingularSourcesAndSinks", dimTag);
 	}
+    
+//    check whether those classes have already been registered
+   {
+       string name = string("IConvectionDiffusionUpwind").append(dimSuffix);
+       if(reg.get_class(name))
+           return;
+   }
+
+/////////////////////////////////////////////////////////////////////////////
+// Upwind
+/////////////////////////////////////////////////////////////////////////////
+
+//    IConvectionDiffusionUpwind
+    {
+        typedef IConvectionDiffusionUpwind<dim> T;
+        string name = string("IConvectionDiffusionUpwind").append(dimSuffix);
+        reg. template add_class_<T>(name, grp);
+        reg.add_class_to_group(name, "IConvectionDiffusionUpwind", dimTag);
+    }
+
+//    ConvectionDiffusionNoUpwind
+    {
+        typedef ConvectionDiffusionNoUpwind<dim> T;
+        typedef IConvectionDiffusionUpwind<dim> TBase;
+        string name = string("ConvectionDiffusionNoUpwind").append(dimSuffix);
+        reg. template add_class_<T, TBase>(name, grp)
+            .add_constructor()
+            .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "ConvectionDiffusionNoUpwind", dimTag);
+    }
+
+//    ConvectionDiffusionFullUpwind
+    {
+        typedef ConvectionDiffusionFullUpwind<dim> T;
+        typedef IConvectionDiffusionUpwind<dim> TBase;
+        string name = string("ConvectionDiffusionFullUpwind").append(dimSuffix);
+        reg. template add_class_<T, TBase>(name, grp)
+            .add_constructor()
+            .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "ConvectionDiffusionFullUpwind", dimTag);
+    }
+    
+//    ConvectionDiffusionLinearProfileSkewedUpwind
+    {
+        typedef ConvectionDiffusionLinearProfileSkewedUpwind<dim> T;
+        typedef IConvectionDiffusionUpwind<dim> TBase;
+        string name = string("ConvectionDiffusionLinearProfileSkewedUpwind").append(dimSuffix);
+        reg. template add_class_<T, TBase>(name, grp)
+            .add_constructor()
+            .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "ConvectionDiffusionLinearProfileSkewedUpwind", dimTag);
+    }
+//    ConvectionDiffusionSkewedUpwind
+    {
+        typedef ConvectionDiffusionSkewedUpwind<dim> T;
+        typedef IConvectionDiffusionUpwind<dim> TBase;
+        string name = string("ConvectionDiffusionSkewedUpwind").append(dimSuffix);
+        reg. template add_class_<T, TBase>(name, grp)
+            .add_constructor()
+            .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "ConvectionDiffusionSkewedUpwind", dimTag);
+    }
+
+
+//    ConvectionDiffusionPositiveUpwind
+    {
+        typedef ConvectionDiffusionPositiveUpwind<dim> T;
+        typedef IConvectionDiffusionUpwind<dim> TBase;
+        string name = string("ConvectionDiffusionPositiveUpwind").append(dimSuffix);
+        reg. template add_class_<T, TBase>(name, grp)
+            .add_constructor()
+            .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "ConvectionDiffusionPositiveUpwind", dimTag);
+    }
+
+//    ConvectionDiffusionRegularUpwind
+    {
+        typedef ConvectionDiffusionRegularUpwind<dim> T;
+        typedef IConvectionDiffusionUpwind<dim> TBase;
+        string name = string("ConvectionDiffusionRegularUpwind").append(dimSuffix);
+        reg. template add_class_<T, TBase>(name, grp)
+            .add_constructor()
+            .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "ConvectionDiffusionRegularUpwind", dimTag);
+    }
+    
 }
 
 }; // end Functionality

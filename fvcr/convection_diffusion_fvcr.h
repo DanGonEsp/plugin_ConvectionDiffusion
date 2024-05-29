@@ -36,6 +36,7 @@
 // library intern headers
 #include "../convection_diffusion_base.h"
 #include "lib_disc/spatial_disc/disc_util/conv_shape_interface.h"
+#include "../upwind_interface.h"
 
 namespace ug{
 namespace ConvectionDiffusionPlugin{
@@ -134,6 +135,11 @@ class ConvectionDiffusionFVCR : public ConvectionDiffusionBase<TDomain>
 		void lin_def_diffusion(const LocalVector& u,
 		                       std::vector<std::vector<MathMatrix<dim,dim> > > vvvLinDef[],
 		                       const size_t nip);
+    ///    computes the linearized defect w.r.t to the flux
+        template <typename TElem, typename TFVGeom>
+        void lin_def_flux(const LocalVector& u,
+                          std::vector<std::vector<MathVector<dim> > > vvvLinDef[],
+                          const size_t nip);
 
 	///	computes the linearized defect w.r.t to the reaction
 		template <typename TElem, typename TFVGeom>
@@ -198,7 +204,15 @@ class ConvectionDiffusionFVCR : public ConvectionDiffusionBase<TDomain>
 	///	returns the updated convection shapes
 		typedef IConvectionShapes<dim> conv_shape_type;
 		const IConvectionShapes<dim>& get_updated_conv_shapes(const FVGeometryBase& geo);
-
+    
+//-----------------------------------------------------------------------
+    ///    Upwinding for scalar value  in convective term of momentum equation
+        SmartPtr<IConvectionDiffusionUpwind<dim> > m_spConvUpwind;
+    public:
+    ///    sets an upwinding for the convective term of momentum equation
+        void set_upwind_new(SmartPtr<IConvectionDiffusionUpwind<dim> > spUpwind)
+            {m_spConvUpwind = spUpwind;}
+//-----------------------------------------------------------------------
 	///	computes the concentration
 		template <typename TElem, typename TFVGeom>
 		void ex_value(number vValue[],
