@@ -51,8 +51,8 @@ ConvectionDiffusionFVCR(const char* functions, const char* subsets)
    m_spConvShape(new ConvectionShapesNoUpwind<dim>),
    m_bNonRegularGrid(false)
 {
-    m_imVelocity.set_comp_lin_defect(false);
-	register_all_funcs(m_bNonRegularGrid);
+        //m_imVelocity.set_comp_lin_defect(false);
+       register_all_funcs(m_bNonRegularGrid);
 }
 
 template<typename TDomain>
@@ -155,7 +155,6 @@ prep_elem(const LocalVector& u, GridObject* elem, const ReferenceObjectID roid, 
 {
 // 	Update Geometry for this element
 	static TFVGeom& geo = GeomProvider<TFVGeom>::get();
-
 	try{
 		geo.update(elem, vCornerCoords, &(this->subset_handler()));
 	}
@@ -279,13 +278,13 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
             if(m_imVelocity.data_given())
             {
                 //	Add Flux contribution
-                number C_down = upwind.downwind_value(ip, u, StdValue);
-                number s = (C_down>0.63) ? 1.0 : 1.0;
+                //number C_down = upwind.downwind_value(ip, u, StdValue);
+                //number s = (C_down<1.0) ? 1.0 : 1.0;
                 
                 for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
                 {
                     const number prod = VecDot(m_imVelocity[ip], scvf.normal());
-                    number convFlux_val = s*upwind.upwind_shape_sh(ip, sh);
+                    number convFlux_val = upwind.upwind_shape_sh(ip, sh);
                     if(upwind.non_zero_shape_ip())
                     {
                         for(size_t ip2 = 0; ip2 < geo.num_scvf(); ++ip2)
@@ -486,7 +485,7 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
 			//	sum up convective flux using convection shapes
 				//number conv_flux = 0.0;
                 number conv_flux = upwind.upwind_value(ip, u, StdValue)*VecDot(m_imVelocity[ip], scvf.normal());
-                number C_down = upwind.downwind_value(ip, u, StdValue);
+                //number C_down = upwind.downwind_value(ip, u, StdValue);
                 //conv_flux=( C_down>0.63 ) ? conv_flux : conv_flux;
 				//for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
 					//conv_flux += upwind.upwind_value(ip, u, StdValue) * vel_flux;
@@ -647,7 +646,7 @@ lin_def_velocity(const LocalVector& u,
 //    interpolate velocity at ip with standard lagrange interpolation
     MathVector<dim> StdVel[TFVGeom::maxNumSCVF];
     number StdValue[TFVGeom::maxNumSCVF];
-    number s;
+    //number s;
     
     for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
     {
@@ -658,7 +657,8 @@ lin_def_velocity(const LocalVector& u,
             StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
         StdVel[ip] = m_imVelocity[ip];
     }
-    m_spConvUpwind->update(&geo, StdVel);
+    m_spConvUpwind->update(&geo, m_imVelocity.values());
+    
 //	reset the values for the linearized defect
 	for(size_t ip = 0; ip < nip; ++ip)
 		for(size_t c = 0; c < vvvLinDef[ip].size(); ++c)
@@ -671,17 +671,18 @@ lin_def_velocity(const LocalVector& u,
 	// get current SCVF
 		const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
 
-        number C_down = upwind.downwind_value(ip, u, StdValue);
-        s=( C_down>0.63 ) ? 1 : 1;
+        //number C_down = upwind.downwind_value(ip, u, StdValue);
+        //s=( C_down>0.63 ) ? 1 : 1;
 
 	//	sum up contributions of convection shapes
 		MathVector<dim> linDefect;
 		VecSet(linDefect, 0.0);
         
         for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
+            //VecScaleAppend(linDefect, upwind.upwind_value(ip, u, StdValue),scvf.normal());
             VecScaleAppend(linDefect, u(_C_,sh)*upwind.upwind_shape_sh(ip, sh),scvf.normal());
     //        VecScaleAppend(linDefect, u(_C_,sh), convShape.D_vel(ip, sh));
-        //VecScaleAppend(linDefect, s*upwind.upwind_value(ip, u, StdValue),scvf.normal());
+            
 	//	add parts for both sides of scvf
 		vvvLinDef[ip][_C_][scvf.from()] += linDefect;
 		vvvLinDef[ip][_C_][scvf.to()] -= linDefect;
@@ -943,7 +944,6 @@ ex_value(number vValue[],
 //	CRFV SCVF ip
 	if(vLocIP == geo.scvf_local_ips())
 	{
-        //printf("  SCVF");
 	//	Loop Sub Control Volume Faces (SCVF)
 		for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
 		{
@@ -966,25 +966,43 @@ ex_value(number vValue[],
 	{
         //printf("  SCV");
 	//	solution at ip
-		for(size_t sh = 0; sh < numSH; ++sh)
-			vValue[sh] = u(_C_, sh);
+        for(size_t sh = 0; sh < numSH; ++sh)
+            vValue[sh] = u(_C_, sh);
+        /*number c=0;
+        number vol=0;
+
+        for(size_t sh = 0; sh < numSH; ++sh){
+            const typename TFVGeom::SCV& scv = geo.scv(sh);
+            
+            c += u(_C_, sh)*scv.volume();
+            vol += scv.volume();
+        }
+        
+        for(size_t sh = 0; sh < numSH; ++sh)
+            vValue[sh] = c/vol;*/
+        
+        
 
 	//	set derivatives if needed
 		if(bDeriv)
 			for(size_t sh = 0; sh < numSH; ++sh)
-				for(size_t sh2 = 0; sh2 < numSH; ++sh2)
-					vvvDeriv[sh][_C_][sh2] = (sh==sh2) ? 1.0 : 0.0;
+                for(size_t sh2 = 0; sh2 < numSH; ++sh2){
+                    /*const typename TFVGeom::SCV& scv = geo.scv(sh);
+					vvvDeriv[sh][_C_][sh2] = (sh==sh2) ? scv.volume()/vol : 0.0;*/
+                    vvvDeriv[sh][_C_][sh2] = (sh==sh2) ? 1.0 : 0.0;
+                 }
+
+                        
+                
 	}
 // 	general case
 	else
 	{
-        //printf("   Error");
 	//	get trial space
-		LagrangeP1<ref_elem_type> rTrialSpace = Provider<LagrangeP1<ref_elem_type> >::get();
-
+		//LagrangeP1<ref_elem_type> rTrialSpace = Provider<LagrangeP1<ref_elem_type> >::get();
+        CrouzeixRaviartLSFS<ref_elem_type> rTrialSpace = Provider<CrouzeixRaviartLSFS<ref_elem_type> >::get();
 	//	storage for shape function at ip
 		number vShape[numSH];
-
 	//	loop ips
 		for(size_t ip = 0; ip < nip; ++ip)
 		{
