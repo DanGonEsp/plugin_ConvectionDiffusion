@@ -279,6 +279,7 @@ class ConvectionDiffusionBase
 
 	///	returns the export of the value of associated unknown function
 		virtual SmartPtr<CplUserData<number, dim> > value();
+        virtual SmartPtr<CplUserData<number, dim> > value_upwind();
 
 	///	returns the export of the gradient of associated unknown function
 		virtual SmartPtr<CplUserData<MathVector<dim>, dim> > gradient();
@@ -286,6 +287,7 @@ class ConvectionDiffusionBase
 	protected:
 	///	Export for the concentration
 		SmartPtr<DataExport<number, dim> > m_exValue;
+        SmartPtr<DataExport<number, dim> > m_exValue_upwind;
 
 	///	Export for the gradient of concentration
 		SmartPtr<DataExport<MathVector<dim>, dim> > m_exGrad;

@@ -644,7 +644,6 @@ lin_def_velocity(const LocalVector& u,
 //	const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo);
     const IConvectionDiffusionUpwind<dim>& upwind = *m_spConvUpwind;
 //    interpolate velocity at ip with standard lagrange interpolation
-    MathVector<dim> StdVel[TFVGeom::maxNumSCVF];
     number StdValue[TFVGeom::maxNumSCVF];
     //number s;
     
@@ -655,7 +654,6 @@ lin_def_velocity(const LocalVector& u,
         StdValue[ip]=0;
         for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
             StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
-        StdVel[ip] = m_imVelocity[ip];
     }
     m_spConvUpwind->update(&geo, m_imVelocity.values());
     
@@ -999,8 +997,8 @@ ex_value(number vValue[],
 	else
 	{
 	//	get trial space
-		//LagrangeP1<ref_elem_type> rTrialSpace = Provider<LagrangeP1<ref_elem_type> >::get();
-        CrouzeixRaviartLSFS<ref_elem_type> rTrialSpace = Provider<CrouzeixRaviartLSFS<ref_elem_type> >::get();
+		LagrangeP1<ref_elem_type> rTrialSpace = Provider<LagrangeP1<ref_elem_type> >::get();
+        //CrouzeixRaviartLSFS<ref_elem_type> rTrialSpace = Provider<CrouzeixRaviartLSFS<ref_elem_type> >::get();
 	//	storage for shape function at ip
 		number vShape[numSH];
 	//	loop ips
@@ -1021,6 +1019,107 @@ ex_value(number vValue[],
 					vvvDeriv[ip][_C_][sh] = vShape[sh];
 		}
 	}
+}
+//    computes the linearized defect w.r.t to the velocity
+template<typename TDomain>
+template <typename TElem, typename TFVGeom>
+void ConvectionDiffusionFVCR<TDomain>::
+ex_value_upwind(number vValue[],
+         const MathVector<dim> vGlobIP[],
+         number time, int si,
+         const LocalVector& u,
+         GridObject* elem,
+         const MathVector<dim> vCornerCoords[],
+         const MathVector<TFVGeom::dim> vLocIP[],
+         const size_t nip,
+         bool bDeriv,
+         std::vector<std::vector<number> > vvvDeriv[])
+{
+//  get finite volume geometry
+    static const TFVGeom& geo = GeomProvider<TFVGeom>::get();
+
+//    reference element
+    typedef typename reference_element_traits<TElem>::reference_element_type ref_elem_type;
+
+//    number of shape functions
+    static const size_t numSH =    ref_elem_type::numCorners;
+    
+    number StdValue[TFVGeom::maxNumSCVF];
+
+    //    get conv shapes
+    //    const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo);
+    
+    //    interpolate velocity at ip with standard lagrange interpolation
+
+    for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+    {
+        const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
+        StdValue[ip]=0;
+        for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
+            StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
+    }
+//    get conv shapes
+//    const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo);
+    const IConvectionDiffusionUpwind<dim>& upwind = *m_spConvUpwind;
+
+    
+    m_spConvUpwind->update(&geo, m_imVelocity.values());
+
+//    CRFV SCVF ip
+    if(vLocIP == geo.scvf_local_ips())
+    {
+    //    Loop Sub Control Volume Faces (SCVF)
+        for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+        {
+        //     Get current SCVF
+            const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
+
+        //    compute concentration at ip
+            vValue[ip] = upwind.upwind_value(ip, u, StdValue);
+
+        //    compute derivative w.r.t. to unknowns iff needed
+            if(bDeriv)
+                for(size_t sh = 0; sh < scvf.num_sh(); ++sh){
+                    number convFlux_val = upwind.upwind_shape_sh(ip, sh);
+                    if(upwind.non_zero_shape_ip())
+                    {
+                        for(size_t ip2 = 0; ip2 < geo.num_scvf(); ++ip2)
+                        {
+                            const typename TFVGeom::SCVF& scvf2 = geo.scvf(ip2);
+                            convFlux_val += scvf2.shape(sh) * upwind.upwind_shape_ip(ip, ip2);
+                        }
+                    }
+                    vvvDeriv[ip][_C_][sh] = convFlux_val;
+                }
+        }
+    }
+    //     general case
+    else
+    {
+    //    get trial space
+        LagrangeP1<ref_elem_type> rTrialSpace = Provider<LagrangeP1<ref_elem_type> >::get();
+        //CrouzeixRaviartLSFS<ref_elem_type> rTrialSpace = Provider<CrouzeixRaviartLSFS<ref_elem_type> >::get();
+    //    storage for shape function at ip
+        number vShape[numSH];
+    //    loop ips
+        for(size_t ip = 0; ip < nip; ++ip)
+        {
+        //    evaluate at shapes at ip
+            rTrialSpace.shapes(vShape, vLocIP[ip]);
+
+        //    compute concentration at ip
+            vValue[ip] = 0.0;
+            for(size_t sh = 0; sh < numSH; ++sh)
+                vValue[ip] += u(_C_, sh) * vShape[sh];
+
+        //    compute derivative w.r.t. to unknowns iff needed
+        //    \todo: maybe store shapes directly in vvvDeriv
+            if(bDeriv)
+                for(size_t sh = 0; sh < numSH; ++sh)
+                    vvvDeriv[ip][_C_][sh] = vShape[sh];
+        }
+    }
+
 }
 
 //	computes the linearized defect w.r.t to the velocity
@@ -1228,6 +1327,7 @@ register_func()
 
 //	exports
 	m_exValue->	   template set_fct<T,refDim>(id, this, &T::template ex_value<TElem, TFVGeom>);
+    m_exValue_upwind->       template set_fct<T,refDim>(id, this, &T::template ex_value_upwind<TElem, TFVGeom>);
 	m_exGrad->template set_fct<T,refDim>(id, this, &T::template ex_grad<TElem, TFVGeom>);
 }
 

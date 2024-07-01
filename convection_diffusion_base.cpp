@@ -430,6 +430,10 @@ typename ConvectionDiffusionBase<TDomain>::NumberExport
 ConvectionDiffusionBase<TDomain>::
 value() {return m_exValue;}
 
+template <typename TDomain>
+typename ConvectionDiffusionBase<TDomain>::NumberExport
+ConvectionDiffusionBase<TDomain>::
+value_upwind() {return m_exValue_upwind;}
 
 template <typename TDomain>
 typename ConvectionDiffusionBase<TDomain>::GradExport
@@ -472,6 +476,7 @@ ConvectionDiffusionBase<TDomain>::
 ConvectionDiffusionBase(const char* functions, const char* subsets)
  : IElemDisc<TDomain>(functions,subsets),
    m_exValue(new DataExport<number, dim>(functions)),
+   m_exValue_upwind(new DataExport<number, dim>(functions)),
    m_exGrad(new DataExport<MathVector<dim>, dim>(functions))
 {
 //	check number of functions

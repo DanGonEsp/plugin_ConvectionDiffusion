@@ -196,6 +196,7 @@ class ConvectionDiffusionFVCR : public ConvectionDiffusionBase<TDomain>
 
 		using base_type::m_exGrad;
 		using base_type::m_exValue;
+        using base_type::m_exValue_upwind;
 
 	protected:
 	/// method to compute the upwind shapes
@@ -225,6 +226,18 @@ class ConvectionDiffusionFVCR : public ConvectionDiffusionBase<TDomain>
 		              const size_t nip,
 		              bool bDeriv,
 		              std::vector<std::vector<number> > vvvDeriv[]);
+    ///    computes the concentration
+        template <typename TElem, typename TFVGeom>
+        void ex_value_upwind(number vValue[],
+                      const MathVector<dim> vGlobIP[],
+                      number time, int si,
+                      const LocalVector& u,
+                      GridObject* elem,
+                      const MathVector<dim> vCornerCoords[],
+                      const MathVector<TFVGeom::dim> vLocIP[],
+                      const size_t nip,
+                      bool bDeriv,
+                      std::vector<std::vector<number> > vvvDeriv[]);
 
 	///	computes the gradient of the concentration
 		template <typename TElem, typename TFVGeom>

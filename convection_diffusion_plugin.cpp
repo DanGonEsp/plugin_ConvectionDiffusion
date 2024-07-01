@@ -171,7 +171,8 @@ static void Domain(TRegistry& reg, string grp)
 #endif
 
 			.add_method("value", &T::value)
-		  .add_method("gradient", &T::gradient);
+            .add_method("value_upwind", &T::value_upwind)
+            .add_method("gradient", &T::gradient);
 		  /*
 			.add_method("set_partial_velocity", &T::set_partial_velocity)
 			.add_method("set_partial_flux", &T::set_partial_flux)
