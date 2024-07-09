@@ -109,25 +109,25 @@ prep_elem_loop(const ReferenceObjectID roid, const int si)
 
 //	set local positions
 	if(!TFVGeom::usesHangingNodes)
-	{
-		static const int refDim = TElem::dim;
-		TFVGeom& geo = GeomProvider<TFVGeom>::get();
-		const MathVector<refDim>* vSCVFip = geo.scvf_local_ips();
-		const size_t numSCVFip = geo.num_scvf_ips();
-		const MathVector<refDim>* vSCVip = geo.scv_local_ips();
-		const size_t numSCVip = geo.num_scv_ips();
-		m_imDiffusion.template 		set_local_ips<refDim>(vSCVFip,numSCVFip, false);
-		m_imVelocity.template 		set_local_ips<refDim>(vSCVFip,numSCVFip, false);
-		m_imFlux.template 			set_local_ips<refDim>(vSCVFip,numSCVFip, false);
-		m_imSource.template 		set_local_ips<refDim>(vSCVip,numSCVip, false);
-		m_imVectorSource.template 	set_local_ips<refDim>(vSCVFip,numSCVFip, false);
-		m_imReactionRate.template 	set_local_ips<refDim>(vSCVip,numSCVip, false);
-		m_imReaction.template 		set_local_ips<refDim>(vSCVip,numSCVip, false);
-		m_imReactionRateExpl.template set_local_ips<refDim>(vSCVip,numSCVip, false);
-		m_imReactionExpl.template 	set_local_ips<refDim>(vSCVip,numSCVip, false);
-		m_imSourceExpl.template 	set_local_ips<refDim>(vSCVip,numSCVip, false);
-		m_imMassScale.template 		set_local_ips<refDim>(vSCVip,numSCVip, false);
-		m_imMass.template 			set_local_ips<refDim>(vSCVip,numSCVip, false);
+    {
+        static const int refDim = TElem::dim;
+        TFVGeom& geo = GeomProvider<TFVGeom>::get();
+        const MathVector<refDim>* vSCVFip = geo.scvf_local_ips();
+        const size_t numSCVFip = geo.num_scvf_ips();
+        const MathVector<refDim>* vSCVip = geo.scv_local_ips();
+        const size_t numSCVip = geo.num_scv_ips();
+        m_imDiffusion.template 		set_local_ips<refDim>(vSCVFip,numSCVFip, false);
+        m_imVelocity.template 		set_local_ips<refDim>(vSCVFip,numSCVFip, false);
+        m_imFlux.template 			set_local_ips<refDim>(vSCVFip,numSCVFip, false);
+        m_imSource.template 		set_local_ips<refDim>(vSCVip,numSCVip, false);
+        m_imVectorSource.template 	set_local_ips<refDim>(vSCVFip,numSCVFip, false);
+        m_imReactionRate.template 	set_local_ips<refDim>(vSCVip,numSCVip, false);
+        m_imReaction.template 		set_local_ips<refDim>(vSCVip,numSCVip, false);
+        m_imReactionRateExpl.template set_local_ips<refDim>(vSCVip,numSCVip, false);
+        m_imReactionExpl.template 	set_local_ips<refDim>(vSCVip,numSCVip, false);
+        m_imSourceExpl.template 	set_local_ips<refDim>(vSCVip,numSCVip, false);
+        m_imMassScale.template 		set_local_ips<refDim>(vSCVip,numSCVip, false);
+        m_imMass.template 			set_local_ips<refDim>(vSCVip,numSCVip, false);
 
 		//	init upwind for element type
 		if(!m_spConvShape->template set_geometry_type<TFVGeom>(geo))
