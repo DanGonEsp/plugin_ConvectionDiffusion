@@ -320,7 +320,7 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
     ////////////////////////////////////////////////////
     // Convective Term
     ////////////////////////////////////////////////////
-    if(m_imVelocity.data_given() && m_imUpwindValue.data_given())
+    /*if(m_imVelocity.data_given() && m_imUpwindValue.data_given())
     {
     //     loop Sub Control Volumes (SCV)
         for(size_t ip = 0; ip < geo.num_scv(); ++ip)
@@ -334,7 +334,7 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
                 J(_C_, 0, _C_, 0) += prod;
 
         }
-    }
+    }*/
 
 ////////////////////////////////////////////////////
 // Reaction Term (using lumping)
