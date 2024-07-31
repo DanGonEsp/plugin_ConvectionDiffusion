@@ -38,6 +38,7 @@ function ConvectionDiffusion(fcts, subsets, discType)
 	if 		discType == "fv1"  then return ConvectionDiffusionFV1(fcts, subsets)
 	elseif  discType == "fe"   then return ConvectionDiffusionFE(fcts, subsets)
 	elseif  discType == "fvcr" then return ConvectionDiffusionFVCR(fcts, subsets)
+    elseif  discType == "fvc" then return ConvectionDiffusionFVC(fcts, subsets)
 	elseif  discType == "fv"   then return ConvectionDiffusionFV(fcts, subsets)
 	else 
 		print("ConvectionDiffusion: no disc type '"..discType.."' available. Aborting")

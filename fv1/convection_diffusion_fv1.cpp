@@ -262,7 +262,6 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
 
 //	Diff. Tensor times Gradient
     MathVector<dim> Dgrad;
-    MathVector<dim> StdVel[TFVGeom::numSCVF];
     MathVector<dim> StdSedVel[TFVGeom::numSCVF];
     number StdValue[TFVGeom::numSCVF];
 //	get conv shapes
@@ -275,7 +274,6 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
         StdValue[ip]=0;
         for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
             StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
-        StdVel[ip] = m_imVelocity[ip];
         if(m_imFlux.data_given())
            StdSedVel[ip] = m_imFlux[ip];
     }
@@ -284,7 +282,7 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
 	if(m_imDiffusion.data_given() || m_imVelocity.data_given())
 	{
         if(m_imVelocity.data_given())
-            m_spConvUpwind->update(&geo, StdVel);
+            m_spConvUpwind->update(&geo, m_imVelocity.values());
 	// 	loop Sub Control Volume Faces (SCVF)
 		for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
 		{
@@ -533,7 +531,6 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
 //     get finite volume geometry
     static const TFVGeom& geo = GeomProvider<TFVGeom>::get();
     const IConvectionDiffusionUpwind<dim>& upwind = *m_spConvUpwind;
-    MathVector<dim> StdVel[TFVGeom::numSCVF];
     MathVector<dim> StdSedVel[TFVGeom::numSCVF];
     number StdValue[TFVGeom::numSCVF];
 
@@ -546,7 +543,6 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
         StdValue[ip]=0;
         for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
             StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
-        StdVel[ip] = m_imVelocity[ip];
         if(m_imFlux.data_given())
            StdSedVel[ip] = m_imFlux[ip];
     }
@@ -554,7 +550,7 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
     if(m_imDiffusion.data_given() || m_imVelocity.data_given())
     {
         if(m_imVelocity.data_given())
-            m_spConvUpwind->update(&geo, StdVel);
+            m_spConvUpwind->update(&geo, m_imVelocity.values());
     //     loop Sub Control Volume Faces (SCVF)
         for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
         {
@@ -607,7 +603,6 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
     }
     if(m_imFlux.data_given())
     {
-        m_spConvUpwind->update(&geo, StdSedVel);
         //     loop Sub Control Volume Faces (SCVF)
         for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
         {

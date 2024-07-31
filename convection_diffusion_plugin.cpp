@@ -36,18 +36,24 @@
 
 #include "bridge/util.h"
 #include "bridge/util_domain_dependent.h"
+#include "bridge/util_domain_algebra_dependent.h"
+
 #include "convection_diffusion_base.h"
 #include "convection_diffusion_sss.h"
 #include "fv1/convection_diffusion_fv1.h"
 #include "fe/convection_diffusion_fe.h"
 #include "fe/convection_diffusion_stab_fe.h"
 #include "fvcr/convection_diffusion_fvcr.h"
+#include "fvc/convection_diffusion_fvc.h"
+#include "fvc/neighbor_concentration_source.h"
+#include "fvc/transport_constraint_fvc.h"
 #include "fv/convection_diffusion_fv.h"
 #include "fractfv1/convection_diffusion_fractfv1.h"
 
 #include "convection_diffusion_plugin.h"
 #include "upwind.h"
 
+#include "lib_disc/function_spaces/grid_function.h"
 using namespace std;
 using namespace ug::bridge;
 
@@ -68,6 +74,85 @@ namespace ConvectionDiffusionPlugin{
 struct Functionality
 {
 
+    
+
+/**
+ * Function called for the registration of Domain and Algebra dependent parts
+ * of the plugin. All Functions and Classes depending on both Domain and Algebra
+ * are to be placed here when registering. The method is called for all
+ * available Domain and Algebra types, based on the current build options.
+ *
+ * @param reg                registry
+ * @param parentGroup        group for sorting of functionality
+ */
+template <typename TDomain, typename TAlgebra, typename TRegistry=ug::bridge::Registry>
+static void DomainAlgebra(Registry& reg, string grp)
+{
+    //static const int dim = TDomain::dim;
+    string suffix = GetDomainAlgebraSuffix<TDomain,TAlgebra>();
+    string tag = GetDomainAlgebraTag<TDomain,TAlgebra>();
+
+    typedef ug::GridFunction<TDomain, TAlgebra> TFct;
+    static const int dim = TDomain::dim;
+
+
+    // GradientSource
+    {
+        string name = string("GradientSource").append(suffix);
+        typedef GradientSource<TFct> T;
+        typedef CplUserData<MathVector<dim>, dim> TBase;
+        typedef INewtonUpdate TBase2;
+        reg.add_class_<T, TBase,TBase2>(name, grp)
+            .template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<TFct>,size_t)>("Approximation space, grid function,DOF")
+                .add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_source), "", "Source")
+                .add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "F_x")
+                .add_method("set_source", static_cast<void (T::*)(number,number)>(&T::set_source), "", "F_x, F_y")
+                .add_method("set_source", static_cast<void (T::*)(number,number,number)>(&T::set_source), "", "F_x, F_y, F_z")
+            #ifdef UG_FOR_LUA
+                .add_method("set_source", static_cast<void (T::*)(const char*)>(&T::set_source), "", "Source Vector")
+            #endif
+                .add_method("update", &T::update)
+        .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "GradientSource", tag);
+    }
+    // UpwindValueSource
+    {
+        string name = string("UpwindValueSource").append(suffix);
+        typedef UpwindValueSource<TFct> T;
+        typedef CplUserData<number, dim> TBase;
+        typedef INewtonUpdate TBase2;
+        reg.add_class_<T, TBase,TBase2>(name, grp)
+            .template add_constructor<void (*)(SmartPtr<ApproximationSpace<TDomain> >,SmartPtr<TFct>,size_t)>("Approximation space, grid function,DOF")
+                .add_method("set_source", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_source), "", "Source")
+                .add_method("set_source", static_cast<void (T::*)(number)>(&T::set_source), "", "F_x")
+                .add_method("set_source", static_cast<void (T::*)(number,number)>(&T::set_source), "", "F_x, F_y")
+                .add_method("set_source", static_cast<void (T::*)(number,number,number)>(&T::set_source), "", "F_x, F_y, F_z")
+            #ifdef UG_FOR_LUA
+                .add_method("set_source", static_cast<void (T::*)(const char*)>(&T::set_source), "", "Source Vector")
+            #endif
+                .add_method("update", &T::update)
+        .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "UpwindValueSource", tag);
+    }
+    
+    //    DiscConstraintFVCR
+    {
+        typedef TrasportConstraintFVC<TFct> T;
+        typedef IDomainConstraint<typename TFct::domain_type,typename TFct::algebra_type> TBase;
+        string name = string("TrasportConstraintFVC").append(suffix);
+        reg.add_class_<T, TBase>(name, grp)
+        .template add_constructor<void (*)(SmartPtr<TFct>,number)>("Grid function,BackFlowValue")
+        // bool bLinUpConvDefect,bool bLinUpConvJacobian,bool bLinPressureDefect,bool bLinPressureJacobian,bool bAdaptive
+        //.template add_constructor<void (*)(SmartPtr<TFct>,bool,bool,bool,bool,bool)>("Grid function,lin up def,lin up jac,lin p def,lin p jac,adaptivity")
+        //.template add_constructor<void (*)(SmartPtr<TFct>,bool,bool,bool,bool,bool,const char*)>("Grid function,lin up def,lin up jac,lin p def,lin p jac,adaptivity,bnd subsets")
+        //.template add_constructor<void (*)(SmartPtr<TFct>,bool,bool,bool,bool,bool,bool)>("Grid function,lin up def,lin up jac,lin p def,lin p jac,adaptivity,limiter")
+        //.template add_constructor<void (*)(SmartPtr<TFct>,bool,bool,bool,bool,bool,bool,const char*)>("Grid function,lin up def,lin up jac,lin p def,lin p jac,adaptivity,limiter,bnd subsets")
+        .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "TrasportConstraintFVC", tag);
+    }
+    
+    
+}
 /**
  * Function called for the registration of Domain dependent parts
  * of the plugin. All Functions and Classes depending on the Domain
@@ -236,6 +321,20 @@ static void Domain(TRegistry& reg, string grp)
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "ConvectionDiffusionFVCR", tag);
 	}
+//    Convection Diffusion FVC
+    {
+        typedef ConvectionDiffusionFVC<TDomain> T;
+        typedef ConvectionDiffusionBase<TDomain> TBase;
+        string name = string("ConvectionDiffusionFVC").append(suffix);
+        reg.template add_class_<T, TBase >(name, grp)
+            .template add_constructor<void (*)(const char*,const char*)>("Function(s)#Subset(s)")
+            .add_method("set_upwind", &T::set_upwind)
+            .add_method("set_upwind_new", &T::set_upwind_new)
+            .add_method("set_upwind_value_source", static_cast<void (T::*)(SmartPtr<CplUserData<number, dim> >)>(&T::set_upwind_value_source))
+            .add_method("set_gradient_source", static_cast<void (T::*)(SmartPtr<CplUserData<MathVector<dim>, dim> >)>(&T::set_gradient_source))
+            .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "ConvectionDiffusionFVC", tag);
+    }
 
 //	Convection Diffusion FV
 	{
@@ -460,6 +559,7 @@ void InitUGPlugin_ConvectionDiffusion(ug::bridge::Registry* reg, string grp)
 	try{
 		RegisterDimensionDependent<Functionality>(*reg,grp);
 		RegisterDomainDependent<Functionality>(*reg,grp);
+        RegisterDomain2d3dAlgebraDependent<Functionality>(*reg,grp);
 		RegisterDomain2d3dDependent<Functionality2d3d>(*reg,grp);
 	}
 	UG_REGISTRY_CATCH_THROW(grp);
@@ -477,6 +577,7 @@ void InitUGPlugin_ConvectionDiffusion_(TRegistry* reg, string grp)
 	try{
 		RegisterDimensionDependent<Functionality>(*reg,grp);
 		RegisterDomainDependent<Functionality, TRegistry>(*reg,grp);
+        RegisterDomain2d3dAlgebraDependent<Functionality, TRegistry>(*reg,grp);
 		RegisterDomain2d3dDependent<Functionality2d3d, TRegistry>(*reg,grp);
 	}
 	UG_REGISTRY_CATCH_THROW(grp);
