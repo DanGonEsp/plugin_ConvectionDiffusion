@@ -111,6 +111,10 @@ class ConvectionDiffusionBase
 	 * value is assumed.
 	 */
 	/// \{
+    ///
+    ///     ///    returns velocity
+        virtual SmartPtr<CplUserData<MathVector<dim>, dim> > velocity() = 0;
+    
 		void set_velocity(SmartPtr<CplUserData<MathVector<dim>, dim> > user);
 		void set_velocity(const std::vector<number>& vVel);
 #ifdef UG_FOR_LUA
@@ -280,6 +284,7 @@ class ConvectionDiffusionBase
 	///	returns the export of the value of associated unknown function
 		virtual SmartPtr<CplUserData<number, dim> > value();
         virtual SmartPtr<CplUserData<number, dim> > value_upwind();
+        virtual SmartPtr<CplUserData<number, dim> > const_value();
 
 	///	returns the export of the gradient of associated unknown function
 		virtual SmartPtr<CplUserData<MathVector<dim>, dim> > gradient();
@@ -287,6 +292,7 @@ class ConvectionDiffusionBase
 	protected:
 	///	Export for the concentration
 		SmartPtr<DataExport<number, dim> > m_exValue;
+        SmartPtr<DataExport<number, dim> > m_ex_ConstValue;
         SmartPtr<DataExport<number, dim> > m_exValue_upwind;
 
 	///	Export for the gradient of concentration

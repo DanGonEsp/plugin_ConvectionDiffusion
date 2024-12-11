@@ -86,6 +86,9 @@ class ConvectionDiffusionFVC : public ConvectionDiffusionBase<TDomain>
     ///    sets the UpwindValueSource function
         void set_gradient_source(SmartPtr<CplUserData<MathVector<dim>, dim> > user);
         DataImport<MathVector<dim>, dim> m_imGradient;
+    
+    ///    returns  velocity
+        SmartPtr<CplUserData<MathVector<dim>, dim> > velocity() {return m_imVelocity.user_data ();}
 
 	private:
 	///	prepares the loop over all elements

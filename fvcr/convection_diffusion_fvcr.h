@@ -210,6 +210,10 @@ class ConvectionDiffusionFVCR : public ConvectionDiffusionBase<TDomain>
     ///    Upwinding for scalar value  in convective term of momentum equation
         SmartPtr<IConvectionDiffusionUpwind<dim> > m_spConvUpwind;
     public:
+    
+    ///    returns  velocity
+        SmartPtr<CplUserData<MathVector<dim>, dim> > velocity() {return m_imVelocity.user_data ();}
+    
     ///    sets an upwinding for the convective term of momentum equation
         void set_upwind_new(SmartPtr<IConvectionDiffusionUpwind<dim> > spUpwind)
             {m_spConvUpwind = spUpwind;}

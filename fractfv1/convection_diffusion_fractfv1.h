@@ -139,6 +139,9 @@ class ConvectionDiffusionFractFV1 : public ConvectionDiffusionBase<TDomain>
 			set_aperture(make_sp(new LuaUserData<number,dim>(fct)));
 		}
 	#endif
+    
+    ///    returns  velocity
+        SmartPtr<CplUserData<MathVector<dim>, dim> > velocity() {return m_imVelocity.user_data ();}
 
 		void set_ortho_velocity(SmartPtr<CplUserData<number, dim> > user)
 		{

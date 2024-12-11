@@ -133,11 +133,7 @@ prep_elem_loop(const ReferenceObjectID roid, const int si)
 		if(!m_spConvShape->template set_geometry_type<TFVGeom>(geo))
 			UG_THROW("ConvectionDiffusionFV1::prep_elem_loop:"
 						" Cannot init upwind for element type.");
-    //    check, that convective upwinding has been set
-        if(m_spConvUpwind.invalid()){
-            UG_THROW("Upwinding for convective Term in Transport eq. not set.");
-        }else
-            m_spConvUpwind->template set_geometry_type<TFVGeom >();
+
 	}
 }
 
@@ -258,31 +254,17 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
 {
 // get finite volume geometry
 	static const TFVGeom& geo = GeomProvider<TFVGeom>::get();
-    const IConvectionDiffusionUpwind<dim>& upwind = *m_spConvUpwind;
 
 //	Diff. Tensor times Gradient
     MathVector<dim> Dgrad;
-    MathVector<dim> StdSedVel[TFVGeom::numSCVF];
-    number StdValue[TFVGeom::numSCVF];
+
 //	get conv shapes
-	//const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo, false);
+	const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo, false);
     
-    
-    for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
-    {
-        const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
-        StdValue[ip]=0;
-        for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
-            StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
-        if(m_imFlux.data_given())
-           StdSedVel[ip] = m_imFlux[ip];
-    }
 
 //	Diffusion and Velocity Term
 	if(m_imDiffusion.data_given() || m_imVelocity.data_given())
 	{
-        if(m_imVelocity.data_given())
-            m_spConvUpwind->update(&geo, m_imVelocity.values());
 	// 	loop Sub Control Volume Faces (SCVF)
 		for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
 		{
@@ -329,7 +311,7 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
 		////////////////////////////////////////////////////
 		// Convective Term
 		////////////////////////////////////////////////////
-			/*if(m_imVelocity.data_given())
+			if(m_imVelocity.data_given())
 			{
 			//	Add Flux contribution
 				for(size_t sh = 0; sh < convShape.num_sh(); ++sh)
@@ -340,8 +322,8 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
 					J(_C_, scvf.from(), _C_, sh) += D_conv_flux;
 					J(_C_, scvf.to(),   _C_, sh) -= D_conv_flux;
 				}
-			}*/
-            if(m_imVelocity.data_given())
+			}
+            /*if(m_imVelocity.data_given())
             {
             //    Add Flux contribution
                 number C_down = upwind.downwind_value(ip, u, StdValue);
@@ -364,12 +346,12 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
                     J(_C_, scvf.from(), _C_, sh) += convFlux_val*prod;
                     J(_C_, scvf.to(),   _C_, sh) -= convFlux_val*prod;
                 }
-            }
+            }*/
 
 			// no explicit dependency on flux import
 		}
 	}
-    if(m_imFlux.data_given())
+    /*if(m_imFlux.data_given())
     {
         m_spConvUpwind->update(&geo, StdSedVel);
         //     loop Sub Control Volume Faces (SCVF)
@@ -399,7 +381,7 @@ add_jac_A_elem(LocalMatrix& J, const LocalVector& u, GridObject* elem, const Mat
                 J(_C_, scvf.to(),   _C_, sh) -= convFlux_val*prod;
             }
         }
-    }
+    }*/
     
     
     
@@ -530,27 +512,12 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
 {
 //     get finite volume geometry
     static const TFVGeom& geo = GeomProvider<TFVGeom>::get();
-    const IConvectionDiffusionUpwind<dim>& upwind = *m_spConvUpwind;
-    MathVector<dim> StdSedVel[TFVGeom::numSCVF];
-    number StdValue[TFVGeom::numSCVF];
 
 //	get conv shapes
-	//const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo, false);
-
-    for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
-    {
-        const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
-        StdValue[ip]=0;
-        for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
-            StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
-        if(m_imFlux.data_given())
-           StdSedVel[ip] = m_imFlux[ip];
-    }
+	const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo, false);
 
     if(m_imDiffusion.data_given() || m_imVelocity.data_given())
     {
-        if(m_imVelocity.data_given())
-            m_spConvUpwind->update(&geo, m_imVelocity.values());
     //     loop Sub Control Volume Faces (SCVF)
         for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
         {
@@ -585,9 +552,19 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
         // Convective Term
         /////////////////////////////////////////////////////
             if(m_imVelocity.data_given())
-            {
+           {
+           //      sum up convective flux using convection shapes
+                   number conv_flux = 0.0;
+                   for(size_t sh = 0; sh < convShape.num_sh(); ++sh)
+                           conv_flux += u(_C_, sh) * convShape(ip, sh);
+
+           //  add to local defect
+                   d(_C_, scvf.from()) += conv_flux;
+                   d(_C_, scvf.to()  ) -= conv_flux;
+          }
+            /*{
             //    sum up convective flux using convection shapes
-                //number conv_flux = 0.0;
+                number conv_flux = 0.0;
                 number conv_flux = upwind.upwind_value(ip, u, StdValue)*VecDot(m_imVelocity[ip], scvf.normal());
                 number C_down = upwind.downwind_value(ip, u, StdValue);
                 conv_flux=conv_flux;//( C_down>0.63 ) ? 0.0 : conv_flux;
@@ -598,10 +575,10 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
             //  add to local defect
                 d(_C_, scvf.from()) += conv_flux;
                 d(_C_, scvf.to()  ) -= conv_flux;
-            }
+            }*/
         }
     }
-    if(m_imFlux.data_given())
+    /*if(m_imFlux.data_given())
     {
         //     loop Sub Control Volume Faces (SCVF)
         for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
@@ -621,7 +598,7 @@ add_def_A_elem(LocalVector& d, const LocalVector& u, GridObject* elem, const Mat
             d(_C_, scvf.from()) += conv_flux;
             d(_C_, scvf.to()  ) -= conv_flux;
         }
-    }
+    }*/
 
 //	reaction rate
 	if(m_imReactionRate.data_given())
@@ -1309,21 +1286,7 @@ lin_def_velocity(const LocalVector& u,
 	static const TFVGeom& geo = GeomProvider<TFVGeom>::get();
 
 //	get conv shapes
-	//const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo, true);
-    const IConvectionDiffusionUpwind<dim>& upwind = *m_spConvUpwind;
-    MathVector<dim> StdVel[TFVGeom::numSCVF];
-    number StdValue[TFVGeom::numSCVF];
-    number s;
-    for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
-    {
-        // get current SCVF
-        const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
-        StdValue[ip]=0;
-        for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
-            StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
-        StdVel[ip] = m_imVelocity[ip];
-    }
-    m_spConvUpwind->update(&geo, StdVel);
+	const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo, true);
 
 //	reset the values for the linearized defect
 	for(size_t ip = 0; ip < nip; ++ip)
@@ -1337,12 +1300,11 @@ lin_def_velocity(const LocalVector& u,
 	// get current SCVF
 		const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
 
-        number C_down = upwind.downwind_value(ip, u, StdValue);
-        s=1.0;//( C_down>0.635 ) ? 0.0 : 1;
 	//	sum up contributions of convection shapes
 		MathVector<dim> linDefect;
 		VecSet(linDefect, 0.0);
-        VecScaleAppend(linDefect, s*upwind.upwind_value(ip, u, StdValue),scvf.normal());
+        for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
+            VecScaleAppend(linDefect, u(_C_,sh), convShape.D_vel(ip, sh));
 
 	//	add parts for both sides of scvf
 		vvvLinDef[ip][_C_][scvf.from()] += linDefect;
@@ -1362,7 +1324,7 @@ lin_def_diffusion(const LocalVector& u,
 	static const TFVGeom& geo = GeomProvider<TFVGeom>::get();
 
 //	get conv shapes
-	//const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo, true);
+	const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo, true);
 
 //	reset the values for the linearized defect
 	for(size_t ip = 0; ip < nip; ++ip)
@@ -1390,16 +1352,16 @@ lin_def_diffusion(const LocalVector& u,
 				linDefect(j,k) = (scvf.normal())[j] * grad_u[k];
 
 	//	add contribution from convection shapes
-		/*if(convShape.non_zero_deriv_diffusion())
+		if(convShape.non_zero_deriv_diffusion())
 			for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
-				MatAdd(linDefect, convShape.D_diffusion(ip, sh), u(_C_, sh));*/
+				MatAdd(linDefect, convShape.D_diffusion(ip, sh), u(_C_, sh));
 
 	//	add contributions
 		vvvLinDef[ip][_C_][scvf.from()] -= linDefect;
 		vvvLinDef[ip][_C_][scvf.to()  ] += linDefect;
 	}
 }
-
+/*
 template<typename TDomain>
 template <typename TElem, typename TFVGeom>
 void ConvectionDiffusionFV1<TDomain>::
@@ -1452,7 +1414,7 @@ lin_def_flux(const LocalVector& u,
         vvvLinDef[ip][_C_][scvf.from()] += linDefect;
         vvvLinDef[ip][_C_][scvf.to()] -= linDefect;
     }
-}
+}*/
 
 //	computes the linearized defect w.r.t to the reaction rate
 template<typename TDomain>
@@ -1820,6 +1782,66 @@ ex_grad(MathVector<dim> vValue[],
 		}
 	}
 };
+//    computes the linearized defect w.r.t to the velocity
+template<typename TDomain>
+template <typename TElem, typename TFVGeom>
+void ConvectionDiffusionFV1<TDomain>::
+ex_const_value(number vValue[],
+         const MathVector<dim> vGlobIP[],
+         number time, int si,
+         const LocalVector& u,
+         GridObject* elem,
+         const MathVector<dim> vCornerCoords[],
+         const MathVector<TFVGeom::dim> vLocIP[],
+         const size_t nip,
+         bool bDeriv,
+         std::vector<std::vector<number> > vvvDeriv[])
+{
+//  get finite volume geometry
+    static const TFVGeom& geo = GeomProvider<TFVGeom>::get();
+
+//    reference element
+    typedef typename reference_element_traits<TElem>::reference_element_type
+            ref_elem_type;
+
+//    number of shape functions
+    static const size_t numSH =    ref_elem_type::numCorners;
+    
+    
+    number value = 0.0;
+    number vol = 0.0;
+    
+//    Loop Sub Control Volumes (SCV)
+    for(size_t sh = 0; sh < numSH; ++sh)
+    {
+        const typename TFVGeom::SCV& scv = geo.scv(sh);
+        value += u(_C_, sh) * scv.volume();
+        vol +=  scv.volume();
+        
+    }
+    value *= 1.0/vol;
+    
+    //    loop ips
+        for(size_t ip = 0; ip < nip; ++ip)
+    {
+
+        vValue[ip] += value;
+
+        if(bDeriv)
+        {
+            for(size_t sh = 0; sh < numSH; ++sh)
+            {
+                const typename TFVGeom::SCV& scv = geo.scv(sh);
+                vvvDeriv[ip][_C_][sh] = scv.volume()/vol;
+            }
+
+            // beware of hanging nodes!
+            size_t ndof = vvvDeriv[ip][_C_].size();
+            for (size_t sh = numSH; sh < ndof; ++sh)
+                vvvDeriv[ip][_C_][sh] = 0.0;
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //	upwind
@@ -1896,7 +1918,7 @@ register_func_for_(bool bHang)
 	{
 		if(m_bCondensedFV)
         UG_THROW("ConvectionDiffusionFV1: Condensed FV not supported for hanging nodes.");
-		//register_func<TElem, HFV1Geometry<TElem, dim> >();
+		register_func<TElem, HFV1Geometry<TElem, dim> >();
 	}
 }
 
@@ -1931,7 +1953,7 @@ register_func()
 //	set computation of linearized defect w.r.t velocity
 	m_imDiffusion.set_fct(id, this, &T::template lin_def_diffusion<TElem, TFVGeom>);
 	m_imVelocity. set_fct(id, this, &T::template lin_def_velocity<TElem, TFVGeom>);
-	m_imFlux.set_fct(id, this, &T::template lin_def_flux<TElem, TFVGeom>);
+	//m_imFlux.set_fct(id, this, &T::template lin_def_flux<TElem, TFVGeom>);
 	m_imReactionRate. set_fct(id, this, &T::template lin_def_reaction_rate<TElem, TFVGeom>);
 	m_imReaction. set_fct(id, this, &T::template lin_def_reaction<TElem, TFVGeom>);
 	m_imSource.	  set_fct(id, this, &T::template lin_def_source<TElem, TFVGeom>);
@@ -1942,6 +1964,7 @@ register_func()
 //	exports
 	m_exValue->	   template set_fct<T,refDim>(id, this, &T::template ex_value<TElem, TFVGeom>);
 	m_exGrad->template set_fct<T,refDim>(id, this, &T::template ex_grad<TElem, TFVGeom>);
+    m_ex_ConstValue->       template set_fct<T,refDim>(id, this, &T::template ex_const_value<TElem, TFVGeom>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -97,7 +97,10 @@ class ConvectionDiffusionFV1 : public ConvectionDiffusionBase<TDomain>
 		
 	///	returns the 'condensed scvf ip' flag
 		bool condensed_FV() {return m_bCondensedFV;}
-
+    
+    ///    returns  velocity
+        SmartPtr<CplUserData<MathVector<dim>, dim> > velocity() {return m_imVelocity.user_data ();}
+    
 	private:
 	/// prepares assembling
 		virtual void prep_assemble_loop();
@@ -275,6 +278,7 @@ class ConvectionDiffusionFV1 : public ConvectionDiffusionBase<TDomain>
 
 		using base_type::m_exGrad;
 		using base_type::m_exValue;
+        using base_type::m_ex_ConstValue;
 
 	protected:
 	/// method to compute the upwind shapes
@@ -305,6 +309,18 @@ class ConvectionDiffusionFV1 : public ConvectionDiffusionBase<TDomain>
 		              const size_t nip,
 		              bool bDeriv,
 		              std::vector<std::vector<number> > vvvDeriv[]);
+    ///    computes the concentration
+        template <typename TElem, typename TFVGeom>
+        void ex_const_value(number vValue[],
+                      const MathVector<dim> vGlobIP[],
+                      number time, int si,
+                      const LocalVector& u,
+                      GridObject* elem,
+                      const MathVector<dim> vCornerCoords[],
+                      const MathVector<TFVGeom::dim> vLocIP[],
+                      const size_t nip,
+                      bool bDeriv,
+                      std::vector<std::vector<number> > vvvDeriv[]);
 
 	///	computes the gradient of the concentration
 		template <typename TElem, typename TFVGeom>

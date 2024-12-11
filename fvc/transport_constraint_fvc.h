@@ -38,31 +38,6 @@
 
 namespace ug{
 
-template <int dim> struct face_type_traits
-{
-    typedef void face_type0;
-	typedef void face_type1;
-};
-
-template <> struct face_type_traits<1>
-{
-    typedef ReferenceVertex face_type0;
-	typedef ReferenceVertex face_type1;
-};
-
-template <> struct face_type_traits<2>
-{
-    typedef ReferenceEdge face_type0;
-	typedef ReferenceEdge face_type1;
-};
-
-template <> struct face_type_traits<3>
-{
-    typedef ReferenceTriangle face_type0;
-	typedef ReferenceQuadrilateral face_type1;
-};
-
-
 
 template <typename TGridFunction>
 class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::domain_type, typename TGridFunction::algebra_type>
@@ -86,9 +61,6 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
 	///	Type of Domain
 		typedef TDomain domain_type;
 
-	/// blockSize of used algebra
-		static const int blockSize = algebra_type::blockSize;
-
 	///	grid type
 		typedef typename domain_type::grid_type grid_type;
 
@@ -101,75 +73,35 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
 	/// element iterator
 		typedef typename TGridFunction::template dim_traits<dim>::const_iterator ElemIterator;
 
-	/// side iterator
-		typedef typename TGridFunction::template traits<side_type>::const_iterator SideIterator;
-
-		static const size_t _P_ = dim;
         static const size_t _C_ = dim+1;
-
-	///	Type of geometric base object
-		typedef typename domain_traits<TDomain::dim>::grid_base_object grid_base_object;
 
 	/// position accessor
 		typedef typename domain_type::position_accessor_type position_accessor_type;
-	
-		typedef std::vector<std::pair<DoFIndex, MathVector<dim> > > vIndexPosPair;
-		typedef std::vector<std::vector<std::pair<DoFIndex, MathVector<dim> > > > vvIndexPosPair;
-		typedef std::pair<MathVector<dim>, MathVector<dim> > MathVector_Pair;
-		
-		typedef MathMatrix<dim,dim> dimMat;
-		typedef Attachment<dimMat> AMathDimMat;
-		typedef PeriodicAttachmentAccessor<side_type,AMathDimMat > aSideDimMat;
-		typedef PeriodicAttachmentAccessor<side_type,ANumber > aSideNumber;
-	
-		typedef Attachment<std::vector< MathVector<dim> > > ANumberArray;
-		typedef Attachment<std::vector< DoFIndex > > ASizetArray;
-		typedef PeriodicAttachmentAccessor<side_type,ANumberArray> aSideNumberArray;
-		typedef PeriodicAttachmentAccessor<side_type,ASizetArray> aSideSizetArray;
-	
-		aSideDimMat acGrad;
-		aSideNumber acVol;
-		aSideNumberArray acGradSh;
-		aSideSizetArray acGradShInd;
-		
-		AMathDimMat aGrad;
-		ANumber aVol;
-		ANumberArray aGradSh;
-		ASizetArray aGradShInd;
-		
-		typedef typename face_type_traits<dim>::face_type0 face_type0;
-		typedef typename face_type_traits<dim>::face_type1 face_type1;
 
 	private:
 		SmartPtr<TGridFunction> m_u;
 		grid_type* m_grid;
-		bool m_bAdaptive;
-		bool m_bLinPressureDefect;
-		bool m_bLinPressureJacobian;
-		bool m_bLinUpConvDefect;
-		bool m_bLinUpConvJacobian;
-		bool m_limiter;
+		bool m_bFVC_ConvectionDefect;
+		bool m_bFVC_Convection_lin_Defect;
+    
         number m_BackFLowValue;
-		ISubsetHandler* m_ish;
-		// zero gradient subset group
-		SubsetGroup m_zeroGradSg;
+
 		
 	public:
-		void init(SmartPtr<TGridFunction> u, number vBackFlowValue){
+		void init(SmartPtr<TGridFunction> u, bool bConvectionDefect, bool bConvection_lin_Defect, number vBackFlowValue){
 			m_u = u;
+            m_bFVC_ConvectionDefect=bConvectionDefect;
+            m_bFVC_Convection_lin_Defect=bConvection_lin_Defect;
             m_BackFLowValue=vBackFlowValue;
 			domain_type& domain = *m_u->domain().get();
 			grid_type& grid = *domain.grid();
 			m_grid = &grid;
-			m_ish = m_u->domain()->subset_handler().get();
-
 		}
 		
 
-
 	/// constructor
-        TrasportConstraintFVC(SmartPtr<TGridFunction> u, number vBackFlowValue){
-			init(u,vBackFlowValue);
+        TrasportConstraintFVC(SmartPtr<TGridFunction> u, bool bConvectionDefect, bool bConvection_lin_Defect, number vBackFlowValue){
+			init(u, bConvectionDefect, bConvection_lin_Defect, vBackFlowValue);
 		};
 
 
@@ -184,6 +116,8 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
 				                             ConstSmartPtr<DoFDistribution> dd, int type, number time = 0.0,
 				                             ConstSmartPtr<VectorTimeSeries<vector_type> > vSol = NULL,const number s_a0 = 1.0){
             
+            if(!m_bFVC_ConvectionDefect) return;
+            
 			domain_type& domain = *m_u->domain().get();
 			position_accessor_type aaPos = m_u->domain()->position_accessor();
 			
@@ -194,7 +128,12 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
             //    create Multiindex
             std::vector<DoFIndex> multInd;
 			std::vector<DoFIndex> ind;
+            std::vector<DoFIndex> ind2;
 			
+            DoFIndex localInd;
+            localInd[1]=0;
+            DoFIndex shapeInd;
+            shapeInd[1]=0;
 			//	create a FV Geometry for the dimension
 			DimCRFVGeometry<dim> geo;
 
@@ -222,9 +161,13 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
                     typename grid_type::template traits<elem_type>::secure_container assoElements;
 					
 					/// handle convection
-					if (true){
+					if (m_bFVC_ConvectionDefect){
 					
 						MathVector<dim> vVel;
+                        MathVector<dim> vLin_Def;
+                        
+                        dd->inner_dof_indices(elem,_C_,ind);
+                        number elemValue = DoFRef(u,ind[0]);
 
                         for(size_t ip = 0; ip < geo.num_scv(); ++ip)
 						{
@@ -232,12 +175,14 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
                             size_t s = scv.node_id();
                             
 							VecSet(vVel, 0.0);
+                            VecSet(vLin_Def, 0.0);
                             for (int d=0;d<dim;d++){
-                                dd->inner_dof_indices(sides[s], d, ind);//Possible error
-                                vVel[d] = DoFRef(u,ind[0]);
+                                dd->dof_indices(elem,0,ind2);
+                                localInd[0]=ind2[s][0]+d;
+                                vVel[d] = DoFRef(u,localInd);
                             }
                             number flux = s_a0*VecDot(vVel,scv.normal());
-                            
+                            VecScale(vLin_Def,scv.normal(),elemValue*s_a0);
                             
                             m_grid->associated_elements(assoElements,sides[s]);
                             size_t numOfAsso = assoElements.size();
@@ -248,6 +193,24 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
                                     
                                     dd->dof_indices(elem, _C_ , multInd);
                                     DoFRef(J,multInd[0],multInd[0]) += flux;
+                                    
+                                    if (m_bFVC_Convection_lin_Defect)
+                                        for (int d=0;d<dim;d++){
+                                            localInd[0]=ind2[s][0]+d;
+                                            DoFRef(J,multInd[0],localInd) += vLin_Def[d];
+                                        }
+                                    
+                                }
+                                else
+                                {
+                                    if (m_bFVC_Convection_lin_Defect)
+                                    {
+                                        dd->dof_indices(elem, _C_ , multInd);
+                                        for (int d=0;d<dim;d++){
+                                            localInd[0]=ind2[s][0]+d;
+                                            DoFRef(J,multInd[0],localInd) -= s_a0*m_BackFLowValue*scv.normal()[d];
+                                        }
+                                    }
                                 }
                             }
                             else//numOfAsso=2
@@ -261,6 +224,20 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
                                     
                                         dd->dof_indices(assoElements[1], _C_ , ind);
                                         DoFRef(J,ind[0],multInd[0]) -= flux;
+                                        
+                                        if (m_bFVC_Convection_lin_Defect)
+                                        {
+                                            
+                                            for (int d=0;d<dim;d++){
+                                                localInd[0]=ind2[s][0]+d;
+                                                
+                                                dd->dof_indices(assoElements[0], _C_ , multInd);
+                                                DoFRef(J,multInd[0],localInd) += vLin_Def[d];
+                                                
+                                                dd->dof_indices(assoElements[1], _C_ , multInd);
+                                                DoFRef(J,multInd[0],localInd) -= vLin_Def[d];
+                                            }
+                                        }
                                     }
                                     else
                                     {
@@ -269,12 +246,26 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
                                         
                                         dd->dof_indices(assoElements[0], _C_ , ind);
                                         DoFRef(J,ind[0],multInd[0]) -= flux;
+                                        
+                                        if (m_bFVC_Convection_lin_Defect)
+                                        {
+                                            for (int d=0;d<dim;d++){
+                                                localInd[0]=ind2[s][0]+d;
+                                                
+                                                dd->dof_indices(assoElements[1], _C_ , multInd);
+                                                DoFRef(J,multInd[0],localInd) += vLin_Def[d];
+                                                
+                                                dd->dof_indices(assoElements[0], _C_ , multInd);
+                                                DoFRef(J,multInd[0],localInd) -= vLin_Def[d];
+                                                
+                                            }
+                                        }
                                     }
                                 }
                             }
 						}
 
-					}// if m_bLinUpConvJacobian
+					}// if m_bFVC_ConvectionDefect
 					
 				}//For Iter
 			}
@@ -388,14 +379,16 @@ class TrasportConstraintFVC: public IDomainConstraint<typename TGridFunction::do
 										   const std::vector<number>* vScaleStiff = NULL)
 		{
             if (vSol == SPNULL){
-                add_convection_defect(d,u,dd);
+                if(m_bFVC_ConvectionDefect)
+                    add_convection_defect(d,u,dd);
             }
 			else {
 				//	loop all time points and assemble them
 				for(size_t t = 0; t < vScaleStiff->size(); ++t){
 					if ((*vScaleStiff)[t]==0) continue;
                     else
-                        add_convection_defect(d,*(vSol->solution(t)),dd,time,(*vScaleStiff)[t]);
+                        if(m_bFVC_ConvectionDefect)
+                            add_convection_defect(d,*(vSol->solution(t)),dd,time,(*vScaleStiff)[t]);
         
 				}
 			}

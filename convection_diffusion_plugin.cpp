@@ -41,6 +41,7 @@
 #include "convection_diffusion_base.h"
 #include "convection_diffusion_sss.h"
 #include "fv1/convection_diffusion_fv1.h"
+#include "fv1/bnd/outflow_fv1.h"
 #include "fe/convection_diffusion_fe.h"
 #include "fe/convection_diffusion_stab_fe.h"
 #include "fvcr/convection_diffusion_fvcr.h"
@@ -141,7 +142,7 @@ static void DomainAlgebra(Registry& reg, string grp)
         typedef IDomainConstraint<typename TFct::domain_type,typename TFct::algebra_type> TBase;
         string name = string("TrasportConstraintFVC").append(suffix);
         reg.add_class_<T, TBase>(name, grp)
-        .template add_constructor<void (*)(SmartPtr<TFct>,number)>("Grid function,BackFlowValue")
+        .template add_constructor<void (*)(SmartPtr<TFct>,bool,bool,number)>("Grid function, Convection, Convection lin defect , BackFlowValue")
         // bool bLinUpConvDefect,bool bLinUpConvJacobian,bool bLinPressureDefect,bool bLinPressureJacobian,bool bAdaptive
         //.template add_constructor<void (*)(SmartPtr<TFct>,bool,bool,bool,bool,bool)>("Grid function,lin up def,lin up jac,lin p def,lin p jac,adaptivity")
         //.template add_constructor<void (*)(SmartPtr<TFct>,bool,bool,bool,bool,bool,const char*)>("Grid function,lin up def,lin up jac,lin p def,lin p jac,adaptivity,bnd subsets")
@@ -257,7 +258,8 @@ static void Domain(TRegistry& reg, string grp)
 
 			.add_method("value", &T::value)
             .add_method("value_upwind", &T::value_upwind)
-            .add_method("gradient", &T::gradient);
+            .add_method("gradient", &T::gradient)
+            .add_method("const_value", &T::const_value);
 		  /*
 			.add_method("set_partial_velocity", &T::set_partial_velocity)
 			.add_method("set_partial_flux", &T::set_partial_flux)
@@ -281,7 +283,25 @@ static void Domain(TRegistry& reg, string grp)
 			.set_construct_as_smart_pointer(true);
 		reg.add_class_to_group(name, "ConvectionDiffusionFV1", tag);
 	}
-
+    //    Convection Diffusion FV1 Outflow boundary condition base
+    {
+        typedef ConvectionDiffusionOutflowBase<TDomain> T;
+        typedef IElemDisc<TDomain> TBase;
+        string name = string("ConvectionDiffusionOutflowBase").append(suffix);
+        reg.template add_class_<T, TBase>(name, grp)
+            .add_method("add", &T::add, "", "Subset(s)");
+        reg.add_class_to_group(name, "ConvectionDiffusionOutflowBase", tag);
+    }
+//    Convection Diffusion FV1 Outflow boundary condition
+    {
+        typedef ConvectionDiffusionOutflowFV1<TDomain> T;
+        typedef ConvectionDiffusionOutflowBase<TDomain> TBase;
+        string name = string("ConvectionDiffusionOutflowFV1").append(suffix);
+        reg.template add_class_<T, TBase>(name, grp)
+            .template add_constructor<void (*)(SmartPtr< ConvectionDiffusionBase<TDomain> >)>("MasterDisc")
+            .set_construct_as_smart_pointer(true);
+        reg.add_class_to_group(name, "ConvectionDiffusionOutflowFV1", tag);
+    }
 //	Convection Diffusion FE
 	{
 		typedef ConvectionDiffusionFE<TDomain> T;

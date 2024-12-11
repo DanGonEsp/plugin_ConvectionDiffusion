@@ -1006,111 +1006,37 @@ ex_value_upwind(number vValue[],
 //    number of shape functions
     static const size_t numSH =    ref_elem_type::numCorners;
     
-    MathVector<dim> StdSedVel[TFVGeom::maxNumSCVF];
-    number StdValue[TFVGeom::maxNumSCVF];
+    //MathVector<dim> StdSedVel[TFVGeom::maxNumSCVF];
+    //number StdValue[TFVGeom::maxNumSCVF];
     
-
-    //    get conv shapes
-    //    const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo);
-    
-    //    interpolate velocity at ip with standard lagrange interpolation
-    MathVector<dim> w;
-    w[dim-1]=1e-010;
-    for(size_t ip = 0; ip < geo.num_scvf(); ++ip)
+    number value=0;
+    number vol=0;
+    for(size_t ip = 0; ip < geo.num_scv(); ++ip)
     {
-        const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
-        StdValue[ip]=0;
-        for(size_t sh = 0; sh < scvf.num_sh(); ++sh)
-            StdValue[ip] += u(_C_, sh) * scvf.shape(sh);
-        if(m_imFlux.data_given())
-            StdSedVel[ip] = w;
+        const typename TFVGeom::SCV& scv = geo.scv(ip);
+        const size_t co = scv.node_id();
+        value += u(_C_, co) * scv.volume();
+        vol += scv.volume();
+
+    }
+    value *=1/vol;
+
+//    loop ips
+    for(size_t ip = 0; ip < nip; ++ip)
+    {
+
+
+    //    compute concentration at ip
+        vValue[ip] = value;
+
+        if(bDeriv)
+            for(size_t sh = 0; sh < numSH; ++sh)
+            {
+                //const typename TFVGeom::SCV& scv = geo.scv(sh);
+                vvvDeriv[ip][_C_][sh] = 0;//*scv.volume()/vol;
+            }
     }
 
-    //    get conv shapes
-    //    const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo);
-    
-    //    interpolate velocity at ip with standard lagrange interpolation
-
-
-//    get conv shapes
-//    const IConvectionShapes<dim>& convShape = get_updated_conv_shapes(geo);
-    const IConvectionDiffusionUpwind<dim>& upwind = *m_spConvUpwind;
-
-    
-    m_spConvUpwind->update(&geo, StdSedVel);
-
-//    CRFV SCVF ip
-    if(true)
-    {
-    //    Loop Sub Control Volume Faces (SCVF)
-        for(size_t ip = 0; ip < nip; ++ip)
-        {
-        //     Get current SCVF
-            const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
-        //    compute concentration at ip
-            
-            if (upwind.downwind_value(ip, u, StdValue)>0.99)
-                vValue[ip] = upwind.downwind_value(ip, u, StdValue);
-            else
-                vValue[ip] = upwind.upwind_value(ip, u, StdValue);
-
-                
-        //    compute derivative w.r.t. to unknowns iff needed
-            if(bDeriv)
-                for(size_t sh = 0; sh < scvf.num_sh(); ++sh){
-                    number convFlux_val = upwind.upwind_shape_sh(ip, sh);
-                    if(upwind.non_zero_shape_ip())
-                    {
-                        for(size_t ip2 = 0; ip2 < geo.num_scvf(); ++ip2)
-                        {
-                            const typename TFVGeom::SCVF& scvf2 = geo.scvf(ip2);
-                            convFlux_val += scvf2.shape(sh) * upwind.upwind_shape_ip(ip, ip2);
-                        }
-                    }
-                    vvvDeriv[ip][_C_][sh] = convFlux_val;
-                }
-        }
-    }
-    //     general case
-    else
-    {
-    //    get trial space
-        LagrangeP1<ref_elem_type> rTrialSpace = Provider<LagrangeP1<ref_elem_type> >::get();
-        //CrouzeixRaviartLSFS<ref_elem_type> rTrialSpace = Provider<CrouzeixRaviartLSFS<ref_elem_type> >::get();
-    //    storage for shape function at ip
-        number vShape[numSH];
-    //    loop ips
-        for(size_t ip = 0; ip < nip; ++ip)
-        {
-        //    evaluate at shapes at ip
-            rTrialSpace.shapes(vShape, vLocIP[ip]);
-            const typename TFVGeom::SCVF& scvf = geo.scvf(ip);
-
-            if (upwind.downwind_value(ip, u, StdValue)>0.99)
-                vValue[ip] = upwind.downwind_value(ip, u, StdValue);
-            else
-                vValue[ip] = upwind.upwind_value(ip, u, StdValue);
-        //    compute concentration at ip
-            /*for(size_t sh = 0; sh < numSH; ++sh)
-                vValue[ip] += u(_C_, sh) * vShape[sh];*/
-
-        //    compute derivative w.r.t. to unknowns iff needed
-        //    \todo: maybe store shapes directly in vvvDeriv
-            if(bDeriv)
-                for(size_t sh = 0; sh < scvf.num_sh(); ++sh){
-                    number convFlux_val = upwind.upwind_shape_sh(ip, sh);
-                    if(upwind.non_zero_shape_ip())
-                    {
-                        for(size_t ip2 = 0; ip2 < geo.num_scvf(); ++ip2)
-                        {
-                            const typename TFVGeom::SCVF& scvf2 = geo.scvf(ip2);
-                            convFlux_val += scvf2.shape(sh) * upwind.upwind_shape_ip(ip, ip2);
-                        }
-                    }
-                    vvvDeriv[ip][_C_][sh] = convFlux_val;
-                }
-        }
-    }
 
 }
 
