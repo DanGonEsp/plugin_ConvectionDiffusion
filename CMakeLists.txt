@@ -40,6 +40,8 @@ message(STATUS "# ConvevtionDiffusion - BEGIN ##################################
 set(pluginName	ConvectionDiffusion)
 set(SOURCES		convection_diffusion_base.cpp
 				fv1/convection_diffusion_fv1.cpp
+				bnd/outflow_base.cpp
+				fv1/bnd/outflow_fv1.cpp
 				fe/convection_diffusion_fe.cpp
 				fe/convection_diffusion_stab_fe.cpp
 				fvcr/convection_diffusion_fvcr.cpp

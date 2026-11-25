@@ -118,7 +118,8 @@ class ConvectionDiffusionBase
 		void set_velocity(LuaFunctionHandle fct);
 #endif
 	/// \}
-
+	///
+		SmartPtr<CplUserData<MathVector<dim>, dim> > velocity() {return m_imVelocity.user_data();}
 	///	sets the flux
 	/**
 	 * This method sets the Flux. If no field is provided a zero
